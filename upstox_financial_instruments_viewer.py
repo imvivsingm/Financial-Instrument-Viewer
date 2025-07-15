@@ -192,6 +192,61 @@ def main():
                     df = df[(df_strike_numeric >= strike_range[0]) & (
                                 df_strike_numeric <= strike_range[1]) & df_strike_numeric.notna()]
 
+        # Expiry date filter (for options/futures)
+        if 'expiry' in df.columns:
+            # Handle null and non-numeric values for expiry timestamps
+            expiry_values = pd.to_numeric(df['expiry'], errors='coerce').dropna()
+            if not expiry_values.empty and len(expiry_values.unique()) > 1:
+                st.sidebar.subheader("📅 Expiry Date Filter")
+
+                # Convert timestamps to dates for display
+                expiry_options = ['All Expiries']
+                expiry_date_map = {'All Expiries': None}
+
+                for timestamp in sorted(expiry_values.unique()):
+                    try:
+                        dt = datetime.fromtimestamp(timestamp / 1000)
+                        display_str = dt.strftime("%d %b %Y")
+                        expiry_options.append(display_str)
+                        expiry_date_map[display_str] = timestamp
+                    except:
+                        continue
+
+                if len(expiry_options) > 1:
+                    # Dropdown for expiry date selection
+                    selected_expiry = st.sidebar.selectbox(
+                        "Select Expiry Date",
+                        options=expiry_options,
+                        help="Choose a specific expiry date to filter"
+                    )
+
+                    if selected_expiry != 'All Expiries':
+                        selected_timestamp = expiry_date_map[selected_expiry]
+                        df_expiry_numeric = pd.to_numeric(df['expiry'], errors='coerce')
+                        df = df[df_expiry_numeric == selected_timestamp]
+
+                    # Quick filters for common expiry selections
+                    st.sidebar.markdown("**Quick Filters:**")
+                    col1, col2 = st.sidebar.columns(2)
+
+                    with col1:
+                        if st.button("📍 Current Week", help="Show options expiring this week"):
+                            current_time = datetime.now()
+                            week_end = current_time + pd.Timedelta(days=7)
+                            week_end_timestamp = week_end.timestamp() * 1000
+
+                            df_expiry_numeric = pd.to_numeric(df['expiry'], errors='coerce')
+                            df = df[df_expiry_numeric <= week_end_timestamp]
+
+                    with col2:
+                        if st.button("📅 Next Month", help="Show options expiring next month"):
+                            current_time = datetime.now()
+                            month_end = current_time + pd.Timedelta(days=30)
+                            month_end_timestamp = month_end.timestamp() * 1000
+
+                            df_expiry_numeric = pd.to_numeric(df['expiry'], errors='coerce')
+                            df = df[df_expiry_numeric <= month_end_timestamp]
+
         # Weekly filter
         if 'weekly' in df.columns:
             # Handle null and non-boolean values
